@@ -6,6 +6,35 @@ Full-power usage against HTB machines (or any authorized target).
 
 ## 1. Infrastructure (one-time setup)
 
+### Docker Compose (recommended)
+
+This repo now includes a compose stack that runs:
+- `db` (PostgreSQL 16)
+- `kali-agent` (Pentest Agent in a Kali container)
+
+```bash
+# One-line setup + Agent REPL (builds image if needed, then opens agent REPL in Kali)
+MODEL=gemma4:12b docker compose run --rm kali-agent
+```
+
+If you also want PostgreSQL memory persistence, start DB separately:
+
+```bash
+docker compose up -d db
+docker compose run --rm kali-agent python3 -m pentest_agent db migrate
+```
+
+The compose file sets:
+- `PENTEST_DB_URL=postgresql+asyncpg://pentest:pentest@db:5432/pentest_agent`
+- `PENTEST_DB_SYNC_URL=postgresql+psycopg2://pentest:pentest@db:5432/pentest_agent`
+- `OLLAMA_BASE_URL=http://host.docker.internal:11434`
+
+When you enter the container session, you land directly in `python3 -m pentest_agent agent-repl` with your chosen `MODEL`.
+
+> Keep Ollama running on the host (`ollama serve`) so the Kali container can reach it.
+
+---
+
 ### PostgreSQL — Memory & Learning Brain
 
 ```bash
@@ -133,7 +162,29 @@ The agent runs autonomously through these phases:
 
 ## 4. During the Run — Human-in-the-Loop
 
-Press **Ctrl+C** at any time to pause the agent and inject commands:
+### Agent REPL (interactive terminal)
+
+```bash
+python -m pentest_agent agent-repl --target 10.129.x.x --model gemma4:12b
+```
+
+Once inside the REPL:
+
+| Command | What It Does |
+|---|---|
+| `/step [n]` | Run n agent iterations (default 1) |
+| `/status` | Show agent tree status summary |
+| `/tree` | Show detailed agent hierarchy |
+| `/target <ip>` | Switch to a new target (resets graph, agents, and conversation) |
+| `/debug` | Toggle detailed debug output (agent errors, graph stats, conversation size) |
+| `/help` | Show this command reference |
+| `/quit` | Exit the REPL |
+| *any other text* | Send as instruction to the root agent |
+
+When debug mode is on (`/debug`), the feedback pane also shows agent errors, graph node counts, agent pool stats, and conversation log length.
+
+### Legacy Pause & Inject (Ctrl+C during `run`)
+
 
 ```
 ⏸️  PAUSED at iteration 12
