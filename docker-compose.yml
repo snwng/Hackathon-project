@@ -1,0 +1,47 @@
+services:
+  db:
+    image: postgres:16
+    container_name: pg-pentest
+    environment:
+      POSTGRES_USER: pentest
+      POSTGRES_PASSWORD: pentest
+      POSTGRES_DB: pentest_agent
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pentest -d pentest_agent"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  kali-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.kali
+    network_mode: host
+    working_dir: /workspace
+    stdin_open: true
+    tty: true
+    environment:
+      PENTEST_DB_URL: postgresql+asyncpg://pentest:pentest@localhost:5432/pentest_agent
+      PENTEST_DB_SYNC_URL: postgresql+psycopg2://pentest:pentest@localhost:5432/pentest_agent
+      OLLAMA_BASE_URL: http://localhost:11434
+      PENTEST_LLM_PROVIDER: ${PENTEST_LLM_PROVIDER:-}
+      PENTEST_LLM_MODEL: ${PENTEST_LLM_MODEL:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      TARGET: 127.0.0.1
+      OBJECTIVE: Gain root/administrator access
+    command: >
+      bash -lc "
+      python3 -m pentest_agent agent-repl
+      --target \"$${TARGET}\"
+      --objective \"$${OBJECTIVE}\"
+      --model \"$${MODEL}\"
+      "
+
+volumes:
+  pgdata:

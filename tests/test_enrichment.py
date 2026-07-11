@@ -1,11 +1,9 @@
 """Tests for CVE enrichment pipeline, CPE matching, and CWE→ATT&CK mapping."""
 
-import pytest
 from pentest_agent.enrichment import (
     map_cwe_to_attack,
     map_capec_to_attack,
     CWE_TO_ATTACK,
-    CAPEC_TO_ATTACK,
 )
 
 
