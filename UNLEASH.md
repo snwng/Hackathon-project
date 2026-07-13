@@ -15,6 +15,9 @@ This repo now includes a compose stack that runs:
 ```bash
 # One-line setup + Agent REPL (builds image if needed, then opens agent REPL in Kali)
 MODEL=gemma4:12b docker compose run --rm kali-agent
+
+# With Gemini API (remote LLM, no Ollama needed):
+GEMINI_API_KEY="your-key" MODEL=gemini-2.5-flash docker compose run --rm kali-agent
 ```
 
 If you also want PostgreSQL memory persistence, start DB separately:
@@ -32,6 +35,9 @@ The compose file sets:
 When you enter the container session, you land directly in `python3 -m pentest_agent agent-repl` with your chosen `MODEL`.
 
 > Keep Ollama running on the host (`ollama serve`) so the Kali container can reach it.
+>
+> **No Ollama? Use Gemini instead.** Set `GEMINI_API_KEY` and pass a `gemini-*` model name.
+> The factory auto-detects the provider from the model prefix (`gemini-*` → Gemini, `gpt-*` → OpenAI, `claude-*` → Anthropic).
 
 ---
 
@@ -82,8 +88,14 @@ EOF
 export NVD_API_KEY="your-nvd-key"       # 50 req/30s instead of 5
 export GITHUB_TOKEN="your-gh-token"     # GitHub PoC search (higher rate limit)
 export ANTHROPIC_API_KEY="your-key"     # If using Claude instead of Ollama
+export OPENAI_API_KEY="your-key"        # If using GPT instead of Ollama
+export GEMINI_API_KEY="your-key"        # If using Gemini instead of Ollama (free tier available)
 export PENTEST_DB_URL="postgresql+asyncpg://pentest:pentest@localhost:5432/pentest_agent"
 ```
+
+If you set both `GEMINI_API_KEY` and have Ollama running, the provider is chosen
+from the `--model` prefix: `gemini-*` → Gemini, `gpt-*` → OpenAI, `claude-*` → Anthropic.
+To force a provider regardless of model name, set `PENTEST_LLM_PROVIDER=gemini`.
 
 ### /etc/hosts (if HTB box uses a hostname)
 
@@ -123,6 +135,7 @@ python -m pentest_agent enrich --service "Samba" --version "4.15.0" --check-poc
 ### The Main Command
 
 ```bash
+# With Ollama (local):
 python -m pentest_agent run \
   --target 10.129.x.x \
   --objective "Capture user.txt and root.txt. Escalate to SYSTEM/root." \
@@ -131,6 +144,12 @@ python -m pentest_agent run \
   --iterations 50 \
   --stealth \
   --export htb_engagement.json
+
+# With Gemini (remote, no Ollama needed):
+GEMINI_API_KEY="your-key" python -m pentest_agent run \
+  --target 10.129.x.x \
+  --model gemini-2.5-flash \
+  --iterations 50
 ```
 
 ### What Each Flag Does
@@ -140,7 +159,7 @@ python -m pentest_agent run \
 | `--target` | IP, CIDR range, or hostname of the target |
 | `--objective` | What the agent is trying to achieve (shown in prompts) |
 | `--mode deep` | Full `-p-` port scan + `-sC` scripts. Use `quick` for top 100 ports only |
-| `--model gemma4:12b` | Ollama model for decision-making |
+| `--model gemma4:12b` | LLM model for decision-making. Prefix auto-selects provider: `gemini-*` → Gemini, `gpt-*` → OpenAI, `claude-*` → Anthropic. Also respects `PENTEST_LLM_PROVIDER` env var. |
 | `--iterations 50` | Max turns per agent (more = deeper testing) |
 | `--stealth` | Uses evasion-aware pathfinding — prefers low-detection-risk edges (SSH keys over PSExec, token manip over LSASS dump) |
 | `--export` | Saves the attack graph as JSON for later analysis |
@@ -175,8 +194,11 @@ Once inside the REPL:
 | `/step [n]` | Run n agent iterations (default 1) |
 | `/status` | Show agent tree status summary |
 | `/tree` | Show detailed agent hierarchy |
+| `/info` | Show LLM provider/model, target, objective, agent counts, graph stats, debug/plan mode |
 | `/target <ip>` | Switch to a new target (resets graph, agents, and conversation) |
 | `/debug` | Toggle detailed debug output (agent errors, graph stats, conversation size) |
+| `/plan` | Toggle approval gate — confirm dangerous actions before execution |
+| `/checkpoint` | Save session state to disk for later resume |
 | `/help` | Show this command reference |
 | `/quit` | Exit the REPL |
 | *any other text* | Send as instruction to the root agent |
