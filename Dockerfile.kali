@@ -15,7 +15,7 @@ RUN printf '%s\n' \
     ca-certificates \
     python3 \
     python3-pip \
-    kali-linux-headless \
+#    kali-linux-headless \
     nmap \
     gobuster \
     && rm -rf /var/lib/apt/lists/*
